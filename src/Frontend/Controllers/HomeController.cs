@@ -2,35 +2,42 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Frontend.Models;
+using Ingredients.Protos;
 
 namespace Frontend.Controllers
 {
     public class HomeController : Controller
     {
+        private readonly IngredientsService.IngredientsServiceClient _client;
         private readonly ILogger<HomeController> _log;
 
-        public HomeController(ILogger<HomeController> log)
+        public HomeController(IngredientsService.IngredientsServiceClient client, ILogger<HomeController> log)
         {
+            _client = client;
             _log = log;
         }
 
         [HttpGet("")]
         public async Task<IActionResult> Index()
         {
-            var toppings = new List<ToppingViewModel>
-            {
-                new("cheese", "Cheese", 1m),
-                new("tomatosauce", "Tomato Sauce", 0.5m),
-            };
-            var crusts = new List<CrustViewModel>
-            {
-                new("thin9", "Thin", 9, 5m),
-                new("deep9", "Deep", 9, 6m),
-            };
+            _log.LogInformation("Index");
+            var toppingsResponse = await _client.GetToppingsAsync(new GetToppingsRequest());
+            var toppings = toppingsResponse.Toppings
+                .Select(t => new ToppingViewModel(t.Topping.Id, t.Topping.Name, Convert.ToDecimal(t.Topping.Price)))
+                .ToList();
+            
+            var crustsResponse = await _client.GetCrustAsync(new GetCrustRequest());
+            var crusts = crustsResponse.Crusts
+                .Select(t => new CrustViewModel(t.Crust.Id, t.Crust.Name, t.Crust.Size, Convert.ToDecimal(t.Crust.Price)))
+                .ToList();
+            
             var viewModel = new HomeViewModel(toppings, crusts);
             return View(viewModel);
         }
